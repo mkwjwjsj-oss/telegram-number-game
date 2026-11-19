@@ -17,17 +17,20 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO,
 )
+logging.getLogger("werkzeug").setLevel(logging.ERROR)
 
-# خادم ويب بسيط لتلبية متطلبات Web Service المجاني
 web_app = Flask(__name__)
 
-@web_app.route("/")
-def home():
-    return "Telegram Number Guessing Bot is alive!"
 
-def run_web_server():
-    port = int(os.environ.get("PORT", 10000))
-    web_app.run(host="0.0.0.0", port=port)
+@web_app.route("/")
+@web_app.route("/health")
+def home():
+    return "Bot is alive", 200
+
+
+def run_web_server() -> None:
+    port = int(os.environ.get("PORT", "10000"))
+    web_app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
 
 
 MIN_NUM = 1
@@ -159,15 +162,16 @@ def main() -> None:
     if not token:
         raise RuntimeError("لم يتم العثور على متغير البيئة BOT_TOKEN.")
 
-    threading.Thread(target=run_web_server, daemon=True).start()
+    server_thread = threading.Thread(target=run_web_server, daemon=True)
+    server_thread.start()
 
     app = ApplicationBuilder().token(token).build()
     app.add_handler(CommandHandler("start", start_command))
     app.add_handler(CommandHandler("game", game_command))
     app.add_handler(CommandHandler("guess", guess_command))
 
-    print("Bot and web server are running...")
-    app.run_polling(allowed_updates=Update.ALL_TYPES)
+    print("Bot and web server are running...", flush=True)
+    app.run_polling(allowed_updates=Update.ALL_TYPES, stop_signals=None)
 
 
 if __name__ == "__main__":
