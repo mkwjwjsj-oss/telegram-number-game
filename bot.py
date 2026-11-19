@@ -1,9 +1,11 @@
 import os
 import random
 import logging
+import threading
 from dataclasses import dataclass, field
 from typing import Dict, Optional
 
+from flask import Flask
 from telegram import Update
 from telegram.ext import (
     ApplicationBuilder,
@@ -15,6 +17,18 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO,
 )
+
+# خادم ويب بسيط لتلبية متطلبات Web Service المجاني
+web_app = Flask(__name__)
+
+@web_app.route("/")
+def home():
+    return "Telegram Number Guessing Bot is alive!"
+
+def run_web_server():
+    port = int(os.environ.get("PORT", 10000))
+    web_app.run(host="0.0.0.0", port=port)
+
 
 MIN_NUM = 1
 MAX_NUM = 50
@@ -29,7 +43,6 @@ class GameSession:
     active: bool = True
 
 
-# تخزين الألعاب النشطة حسب معرف المحادثة (مجموعات أو محادثات خاصة)
 games: Dict[int, GameSession] = {}
 
 
@@ -119,7 +132,6 @@ async def guess_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
     hint = "أكبر" if guess_val < session.secret_number else "أصغر"
 
-    # التحقق مما إذا انتهت محاولات جميع اللاعبين المشاركين
     all_exhausted = len(session.player_attempts) > 0 and all(
         attempts >= MAX_ATTEMPTS_PER_PLAYER
         for attempts in session.player_attempts.values()
@@ -147,12 +159,14 @@ def main() -> None:
     if not token:
         raise RuntimeError("لم يتم العثور على متغير البيئة BOT_TOKEN.")
 
+    threading.Thread(target=run_web_server, daemon=True).start()
+
     app = ApplicationBuilder().token(token).build()
     app.add_handler(CommandHandler("start", start_command))
     app.add_handler(CommandHandler("game", game_command))
     app.add_handler(CommandHandler("guess", guess_command))
 
-    print("Bot is running...")
+    print("Bot and web server are running...")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 
